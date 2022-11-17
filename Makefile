@@ -51,3 +51,6 @@ LINUXINCLUDE    += -include $(srctree)/techpack/display/config/bengaldispconf.h
 endif
 
 obj-$(CONFIG_DRM_MSM) += msm/
+#ifdef OPLUS_BUG_STABILITY
+#obj-$(CONFIG_DRM_OPLUS) += oplus/
+#endif /* OPLUS_BUG_STABILITY */
