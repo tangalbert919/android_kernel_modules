@@ -132,6 +132,9 @@ static u32 swr_master_read(struct swr_mstr_ctrl *swrm, unsigned int reg_addr);
 static void swr_master_write(struct swr_mstr_ctrl *swrm, u16 reg_addr, u32 val);
 static int swrm_runtime_resume(struct device *dev);
 static void swrm_wait_for_fifo_avail(struct swr_mstr_ctrl *swrm, int swrm_rd_wr);
+#ifdef OPLUS_BUG_STABILITY
+static int swrm_master_init(struct swr_mstr_ctrl *swrm);
+#endif /* OPLUS_BUG_STABILITY */
 
 static u8 swrm_get_device_id(struct swr_mstr_ctrl *swrm, u8 devnum)
 {
@@ -1944,10 +1947,19 @@ static void swrm_enable_slave_irq(struct swr_mstr_ctrl *swrm)
 	dev_dbg(swrm->dev, "%s: slave status: 0x%x\n", __func__, status);
 	for (i = 0; i < (swrm->master.num_dev + 1); i++) {
 		if (status & SWRM_MCP_SLV_STATUS_MASK) {
+			#ifndef OPLUS_BUG_STABILITY
 			swrm_cmd_fifo_rd_cmd(swrm, &temp, i, 0x0,
 					SWRS_SCP_INT_STATUS_CLEAR_1, 1);
 			swrm_cmd_fifo_wr_cmd(swrm, 0xFF, i, 0x0,
 					SWRS_SCP_INT_STATUS_CLEAR_1);
+			#else /* OPLUS_BUG_STABILITY */
+			if (!swrm->clk_stop_wakeup) {
+				swrm_cmd_fifo_rd_cmd(swrm, &temp, i, 0x0,
+						SWRS_SCP_INT_STATUS_CLEAR_1, 1);
+				swrm_cmd_fifo_wr_cmd(swrm, 0xFF, i, 0x0,
+						SWRS_SCP_INT_STATUS_CLEAR_1);
+			}
+			#endif /* OPLUS_BUG_STABILITY */
 			swrm_cmd_fifo_wr_cmd(swrm, 0x4, i, 0x0,
 					SWRS_SCP_INT_STATUS_MASK_1);
 		}
@@ -1989,6 +2001,9 @@ static irqreturn_t swr_mstr_interrupt(int irq, void *dev)
 	struct swr_device *swr_dev;
 	struct swr_master *mstr = &swrm->master;
 	int retry = 5;
+	#ifdef OPLUS_BUG_STABILITY
+	int mcp_slv_status;
+	#endif /* OPLUS_BUG_STABILITY */
 
 	trace_printk("%s enter\n", __func__);
 	if (unlikely(swrm_lock_sleep(swrm) == false)) {
@@ -2135,7 +2150,22 @@ handle_irq:
 			dev_err_ratelimited(swrm->dev,
 			"%s: SWR CMD error, fifo status 0x%x, flushing fifo\n",
 					__func__, value);
+			#ifndef OPLUS_BUG_STABILITY
 			swr_master_write(swrm, SWRM_CMD_FIFO_CMD, 0x1);
+			#else /* OPLUS_BUG_STABILITY */
+			mcp_slv_status = swr_master_read(swrm, SWRM_MCP_SLV_STATUS);
+			if (!mcp_slv_status && (value & 0x40)) {
+				/* Slave is not enumerated and fifo status gives nack */
+				pr_err("%s: do soft reset for swr when enumeration lost during cmd error.\n",
+						__func__);
+				swr_master_write(swrm, SWRM_CMD_FIFO_CMD, 0x1);
+				swr_master_write(swrm, SWRM_COMP_SW_RESET, 0x01);
+				swrm_master_init(swrm);
+				/* wait for hw enumeration to complete */
+				usleep_range(100, 105);
+			} else
+				swr_master_write(swrm, SWRM_CMD_FIFO_CMD, 0x1);
+			#endif /* OPLUS_BUG_STABILITY */
 			break;
 		case SWRM_INTERRUPT_STATUS_DOUT_PORT_COLLISION:
 			dev_err_ratelimited(swrm->dev,
@@ -2193,7 +2223,13 @@ handle_irq:
 				 * re-enable Host IRQ and process slave pending
 				 * interrupts, if any.
 				 */
+				#ifndef OPLUS_BUG_STABILITY
 				swrm_enable_slave_irq(swrm);
+				#else /* OPLUS_BUG_STABILITY */
+				swrm->clk_stop_wakeup = true;
+				swrm_enable_slave_irq(swrm);
+				swrm->clk_stop_wakeup = false;
+				#endif /* OPLUS_BUG_STABILITY */
 			}
 			break;
 		default:
@@ -2827,6 +2863,10 @@ static int swrm_probe(struct platform_device *pdev)
 	swrm->dev_up = true;
 	swrm->state = SWR_MSTR_UP;
 	swrm->ipc_wakeup = false;
+	#ifdef OPLUS_BUG_STABILITY
+	swrm->enable_slave_irq = false;
+	swrm->clk_stop_wakeup = false;
+	#endif /* #ifdef OPLUS_BUG_STABILITY */
 	swrm->ipc_wakeup_triggered = false;
 	swrm->disable_div2_clk_switch = FALSE;
 	init_completion(&swrm->reset);
