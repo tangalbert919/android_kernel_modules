@@ -8338,10 +8338,17 @@ int cam_ife_hw_mgr_init(struct cam_hw_mgr_intf *hw_mgr_intf, int *iommu_hdl)
 				&g_ife_hw_mgr.ctx_pool[i].free_res_list);
 		}
 
+		#ifndef OPLUS_FEATURE_CAMERA_COMMON
 		g_ife_hw_mgr.ctx_pool[i].cdm_cmd =
 			kzalloc(((sizeof(struct cam_cdm_bl_request)) +
 				((CAM_IFE_HW_ENTRIES_MAX - 1) *
 				 sizeof(struct cam_cdm_bl_cmd))), GFP_KERNEL);
+		#else
+		g_ife_hw_mgr.ctx_pool[i].cdm_cmd =
+			kzalloc(((sizeof(struct cam_cdm_bl_request)) +
+				((CAM_ISP_CTX_CFG_MAX - 1) *
+				 sizeof(struct cam_cdm_bl_cmd))), GFP_KERNEL);
+		#endif /*OPLUS_FEATURE_CAMERA_COMMON*/
 		if (!g_ife_hw_mgr.ctx_pool[i].cdm_cmd) {
 			rc = -ENOMEM;
 			CAM_ERR(CAM_ISP, "Allocation Failed for cdm command");
