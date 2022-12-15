@@ -753,7 +753,6 @@ static int dp_audio_on(struct dp_audio *dp_audio)
 	rc = dp_audio_config(audio, EXT_DISPLAY_CABLE_CONNECT);
 	if (rc)
 		goto end;
-
 	rc = dp_audio_notify(audio, EXT_DISPLAY_CABLE_CONNECT);
 	if (rc)
 		goto end;
@@ -810,7 +809,6 @@ static void dp_audio_notify_work_fn(struct work_struct *work)
 	struct delayed_work *dw = to_delayed_work(work);
 
 	audio = container_of(dw, struct dp_audio_private, notify_delayed_work);
-
 	dp_audio_notify(audio, EXT_DISPLAY_CABLE_CONNECT);
 }
 
