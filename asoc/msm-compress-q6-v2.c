@@ -2963,7 +2963,6 @@ static int msm_compr_trigger(struct snd_compr_stream *cstream, int cmd)
 				msm_compr_send_buffer(prtd);
 			}
 		}
-
 		atomic_set(&prtd->drain, 1);
 		spin_unlock_irqrestore(&prtd->lock, flags);
 #endif
