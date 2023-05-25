@@ -1237,7 +1237,6 @@ static void cam_hw_cdm_work(struct work_struct *work)
 			payload = NULL;
 			return;
 		}
-
 		mutex_lock(&core->bl_fifo[fifo_idx].fifo_lock);
 
 		if (atomic_read(&core->bl_fifo[fifo_idx].work_record))
